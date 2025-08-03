@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lihansa H.E.C. - Management System</title>
+    <style>
+        /* --- Global Styles & Variables --- */
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #34495e;
+            --accent-color: #1abc9c;
+            --light-color: #ecf0f1;
+            --text-color: #333;
+            --border-color: #bdc3c7;
+            --danger-color: #e74c3c;
+            --success-color: #2ecc71;
+            --font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: var(--font-family);
+            background-color: var(--light-color);
+            color: var(--text-color);
+        }
+
+        /* --- Login Screen --- */
+        #login-overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+        .login-box {
+            background: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+        }
+        .login-box h2 { margin-bottom: 20px; color: var(--primary-color); }
+        #login-error { color: var(--danger-color); margin-top: 15px; min-height: 20px; }
+
+        /* --- Main App Layout --- */
+        #app-container {
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .sidebar {
+            width: 250px;
+            background-color: var(--primary-color);
+            color: white;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.3s ease-in-out;
+        }
+        .sidebar-header { text-align: center; margin-bottom: 30px; }
+        .sidebar-header h2 { font-size: 1.6rem; }
+        .sidebar-nav ul { list-style-type: none; }
+        .sidebar-nav li a {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: white;
+            text-decoration: none;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            transition: background-color 0.3s;
+            font-size: 1.1rem;
+        }
+        .sidebar-nav li a:hover, .sidebar-nav li a.active { background-color: var(--secondary-color); }
+        .sidebar-footer { margin-top: auto; text-align: center; }
+        
+        .main-content { flex-grow: 1; padding: 30px; overflow-y: auto; }
+        .page { display: none; }
+        .page.active { display: block; animation: fadeIn 0.5s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* --- Reusable Components --- */
+        .btn {
+            padding: 10px 18px; border: none; border-radius: 5px; cursor: pointer;
+            font-size: 1rem; font-weight: bold; transition: opacity 0.3s;
+        }
+        .btn:hover { opacity: 0.85; }
+        .btn-primary { background-color: var(--accent-color); color: white; }
+        .btn-secondary { background-color: var(--secondary-color); color: white; }
+        .btn-danger { background-color: var(--danger-color); color: white; }
+        .btn-small { padding: 5px 10px; font-size: 0.8rem; }
+
+        table {
+            width: 100%; border-collapse: collapse; margin-top: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1); background: white;
+        }
+        th, td { padding: 12px 15px; border: 1px solid var(--border-color); text-align: left; }
+        th { background-color: var(--secondary-color); color: white; }
+        tbody tr:nth-child(even) { background-color: #f9f9f9; }
+        tbody tr:hover { background-color: #e8f4f2; }
+
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%; padding: 10px; border: 1px solid var(--border-color);
+            border-radius: 5px; font-size: 1rem;
+        }
+        .form-group-inline { display: flex; align-items: center; gap: 10px; }
+
+        .modal {
+            display: none; position: fixed; z-index: 1000; left: 0; top: 0;
+            width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5);
+            justify-content: center; align-items: center;
+        }
+        .modal-content {
+            background-color: #fff; padding: 30px; border-radius: 8px;
+            width: 90%; max-width: 600px; box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            animation: slide-down 0.3s ease-out;
+        }
+        @keyframes slide-down { from { transform: translateY(-30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 15px; margin-bottom: 20px; }
+        .close-btn { cursor: pointer; font-size: 1.8rem; font-weight: bold; color: #aaa; }
+        .close-btn:hover { color: var(--text-color); }
+
+        .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+        .card { background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        
+        /* --- Dashboard Specific --- */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
+        .stat-card { background: var(--secondary-color); color: white; padding: 20px; border-radius: 8px; text-align: center; }
+        .stat-card h3 { font-size: 1.2rem; }
+        .stat-card p { font-size: 2.5rem; font-weight: bold; }
+        .chart-container { padding: 20px; }
+        .bar-chart { display: flex; justify-content: space-around; align-items: flex-end; height: 250px; border-left: 2px solid var(--border-color); border-bottom: 2px solid var(--border-color); padding: 10px; }
+        .bar { width: 50px; background-color: var(--accent-color); text-align: center; color: white; position: relative; transition: height 0.5s ease-out; }
+        .bar .label { position: absolute; bottom: -25px; width: 100%; text-align: center; color: var(--text-color); font-size: 0.9rem; }
+        .bar .value { padding-top: 5px; font-weight: bold; }
+
+        /* --- Attendance Specific --- */
+        #attendance-note { width: 100%; margin-top: 5px; }
+
+        /* --- Responsive --- */
+        @media (max-width: 768px) {
+            #app-container { flex-direction: column; }
+            .sidebar { width: 100%; height: auto; flex-direction: row; justify-content: space-around; padding: 10px; z-index: 10; }
+            .sidebar-header, .sidebar-footer { display: none; }
+            .sidebar-nav ul { display: flex; flex-wrap: wrap; justify-content: center; }
+            .sidebar-nav li a { padding: 10px; margin: 5px; }
+            .main-content { padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Login Screen -->
+    <div id="login-overlay">
+        <div class="login-box">
+            <h2 id="login-title">Admin Login</h2>
+            <p id="login-subtitle" style="margin-bottom: 20px; color: #666;"></p>
+            <form id="login-form">
+                <div class="form-group">
+                    <input type="text" id="username" placeholder="Username" required>
+                </div>
+                <div class="form-group">
+                    <input type="password" id="password" placeholder="Password" required>
+                </div>
+                <div class="form-group" id="confirm-password-group" style="display: none;">
+                    <input type="password" id="confirm-password" placeholder="Confirm Password">
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">Login</button>
+                <p id="login-error"></p>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main Application -->
+    <div id="app-container" style="display: none;">
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h2>Lihansa H.E.C.</h2>
+                <p>Management System</p>
+            </div>
+            <ul class="sidebar-nav">
+                <li><a href="#dashboard" class="nav-link active">📊 Dashboard</a></li>
+                <li><a href="#students" class="nav-link">🎓 Students</a></li>
+                <li><a href="#classes" class="nav-link">📚 Classes</a></li>
+                <li><a href="#teachers" class="nav-link">👩‍🏫 Teachers</a></li>
+                <li><a href="#attendance" class="nav-link">📋 Attendance</a></li>
+                <li><a href="#reports" class="nav-link">💰 Financials</a></li>
+            </ul>
+            <div class="sidebar-footer">
+                <button id="logoutBtn" class="btn btn-danger">Logout</button>
+            </div>
+        </nav>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Dashboard Page -->
+            <section id="dashboard" class="page active">
+                <div class="page-header"><h1>Dashboard</h1></div>
+                <div class="stats-grid">
+                    <div class="stat-card"><h3>Total Students</h3><p id="totalStudents">0</p></div>
+                    <div class="stat-card"><h3>Total Classes</h3><p id="totalClasses">0</p></div>
+                    <div class="stat-card" style="background-color: var(--success-color);"><h3>Today's Income</h3><p id="todaysIncome">0</p></div>
+                </div>
+                <div class="card" style="margin-top: 30px;">
+                    <h3>Institute Overview</h3>
+                    <div class="chart-container">
+                        <div class="bar-chart" id="overviewChart">
+                            <!-- Bars will be generated by JS -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Students Page -->
+            <section id="students" class="page">
+                <div class="page-header">
+                    <h1>Student Management</h1>
+                    <div>
+                        <button class="btn btn-secondary" id="exportCsvBtn">Export to CSV</button>
+                        <button class="btn btn-secondary" id="exportPdfBtn">Export to PDF</button>
+                        <button class="btn btn-primary" id="addStudentBtn">Add New Student</button>
+                    </div>
+                </div>
+                <div class="card">
+                    <table id="studentsTable">
+                        <thead><tr><th>ID</th><th>Name</th><th>Grade</th><th>WhatsApp</th><th>Actions</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Classes Page -->
+            <section id="classes" class="page">
+                <div class="page-header"><h1>Class Management</h1><button class="btn btn-primary" id="addClassBtn">Add New Class</button></div>
+                <div class="card" id="classList"></div>
+            </section>
+            
+            <!-- Teachers Page -->
+            <section id="teachers" class="page">
+                <div class="page-header"><h1>Teacher Management</h1><button class="btn btn-primary" id="addTeacherBtn">Add New Teacher</button></div>
+                <div class="card">
+                    <table id="teachersTable">
+                        <thead><tr><th>Name</th><th>Contact</th><th>Actions</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Attendance Page -->
+            <section id="attendance" class="page">
+                <div class="page-header"><h1>Daily Attendance</h1></div>
+                <div class="card">
+                    <div class="form-group-inline">
+                        <div class="form-group" style="flex-grow: 1;">
+                            <label for="attendanceClassSelect">Select a Class</label>
+                            <select id="attendanceClassSelect"><option value="">-- Please select --</option></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="attendanceDate">Date</label>
+                            <input type="date" id="attendanceDate">
+                        </div>
+                    </div>
+                    <div id="attendanceSheet" style="margin-top: 20px;"></div>
+                </div>
+            </section>
+            
+            <!-- Financial Reports Page -->
+            <section id="reports" class="page">
+                <div class="page-header"><h1>Financial Reports</h1></div>
+                <div class="card">
+                    <div class="form-group">
+                        <label for="reportDate">Select Date to Generate Report</label>
+                        <input type="date" id="reportDate">
+                    </div>
+                    <div id="reportContent"></div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <!-- Student Modal -->
+    <div id="studentModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header"><h2 id="studentModalTitle">Add Student</h2><span class="close-btn" data-modal="studentModal">&times;</span></div>
+            <form id="studentForm">
+                <input type="hidden" id="studentIdInput">
+                <div class="form-group"><label for="studentName">Full Name</label><input type="text" id="studentName" required></div>
+                <div class="form-group"><label for="studentAddress">Address</label><textarea id="studentAddress" rows="2"></textarea></div>
+                <div class="form-group"><label for="studentWhatsapp">WhatsApp Number</label><input type="tel" id="studentWhatsapp"></div>
+                <div class="form-group"><label for="studentGrade">Grade</label><input type="text" id="studentGrade" required></div>
+                <div class="form-group"><label>Enrolled Classes</label><div id="studentClassesCheckboxes" style="max-height: 150px; overflow-y: auto; border: 1px solid var(--border-color); padding: 10px; border-radius: 5px;"></div></div>
+                <button type="submit" class="btn btn-primary">Save Student</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Class Modal -->
+    <div id="classModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header"><h2 id="classModalTitle">Add Class</h2><span class="close-btn" data-modal="classModal">&times;</span></div>
+            <form id="classForm">
+                <input type="hidden" id="classIdInput">
+                <div class="form-group"><label for="className">Class Name (e.g., Grade 8 Science)</label><input type="text" id="className" required></div>
+                <div class="form-group"><label for="classFee">Class Fee (LKR)</label><input type="number" id="classFee" required min="0"></div>
+                <div class="form-group"><label for="classSection">Section</label><select id="classSection" required></select></div>
+                <div class="form-group"><label for="classTeacher">Teacher</label><select id="classTeacher" required><option value="">-- Select Teacher --</option></select></div>
+                <button type="submit" class="btn btn-primary">Save Class</button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Teacher Modal -->
+    <div id="teacherModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header"><h2 id="teacherModalTitle">Add Teacher</h2><span class="close-btn" data-modal="teacherModal">&times;</span></div>
+            <form id="teacherForm">
+                <input type="hidden" id="teacherIdInput">
+                <div class="form-group"><label for="teacherName">Full Name</label><input type="text" id="teacherName" required></div>
+                <div class="form-group"><label for="teacherContact">Contact (Phone/Email)</label><input type="text" id="teacherContact" required></div>
+                <button type="submit" class="btn btn-primary">Save Teacher</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- jsPDF Library (minified, for PDF export) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+
+    <!-- Main Application Logic -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- STATE MANAGEMENT ---
+            let state = {
+                students: [],
+                classes: [],
+                teachers: [],
+                attendance: {}, // { "YYYY-MM-DD": { "classId": { "studentId": { present: true, feePaid: false, note: "..." } } } }
+                admin: null // { user: "...", pass: "..." }
+            };
+
+            const SECTIONS = [
+                "Primary (3-5)", "Secondary (6-9)", "O/L (10-11)", 
+                "A/L - Arts", "A/L - Science", "A/L - Commerce"
+            ];
+
+            // --- LOCALSTORAGE PERSISTENCE ---
+            function saveData() {
+                localStorage.setItem('lihansaProSystem', JSON.stringify(state));
+            }
+
+            function loadData() {
+                const data = localStorage.getItem('lihansaProSystem');
+                if (data) {
+                    state = JSON.parse(data);
+                }
+            }
+
+            // --- UI ELEMENT REFERENCES ---
+            const appContainer = document.getElementById('app-container');
+            const loginOverlay = document.getElementById('login-overlay');
+            const pages = document.querySelectorAll('.page');
+            const navLinks = document.querySelectorAll('.nav-link');
+            const modals = {
+                student: document.getElementById('studentModal'),
+                class: document.getElementById('classModal'),
+                teacher: document.getElementById('teacherModal'),
+            };
+
+            // --- AUTHENTICATION ---
+            function handleAuth() {
+                loadData();
+                if (!state.admin) {
+                    // First time setup
+                    loginOverlay.style.display = 'flex';
+                    document.getElementById('login-title').textContent = 'Create Admin Account';
+                    document.getElementById('login-subtitle').textContent = 'This will be used to log in to the system.';
+                    document.getElementById('confirm-password-group').style.display = 'block';
+                    document.querySelector('#login-form button').textContent = 'Create Account';
+                } else {
+                    // Normal login
+                    loginOverlay.style.display = 'flex';
+                    document.getElementById('login-subtitle').textContent = 'Please enter your credentials to continue.';
+                }
+            }
+
+            document.getElementById('login-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const user = document.getElementById('username').value;
+                const pass = document.getElementById('password').value;
+                const errorEl = document.getElementById('login-error');
+                errorEl.textContent = '';
+
+                if (!state.admin) { // Creating account
+                    const confirmPass = document.getElementById('confirm-password').value;
+                    if (pass !== confirmPass) {
+                        errorEl.textContent = 'Passwords do not match.';
+                        return;
+                    }
+                    state.admin = { user, pass }; // Note: Storing password directly is insecure. For this self-contained app, it's a trade-off.
+                    saveData();
+                    loginSuccess();
+                } else { // Logging in
+                    if (user === state.admin.user && pass === state.admin.pass) {
+                        loginSuccess();
+                    } else {
+                        errorEl.textContent = 'Invalid username or password.';
+                    }
+                }
+            });
+
+            function loginSuccess() {
+                loginOverlay.style.display = 'none';
+                appContainer.style.display = 'flex';
+                initialize();
+            }
+
+            document.getElementById('logoutBtn').addEventListener('click', () => {
+                if (confirm('Are you sure you want to logout?')) {
+                    location.reload();
+                }
+            });
+
+            // --- NAVIGATION ---
+            function navigateTo(hash) {
+                pages.forEach(p => p.classList.remove('active'));
+                navLinks.forEach(l => l.classList.remove('active'));
+                document.querySelector(hash)?.classList.add('active');
+                document.querySelector(`.nav-link[href="${hash}"]`)?.classList.add('active');
+                
+                // Refresh data on navigation
+                if (hash === '#dashboard') renderDashboard();
+                if (hash === '#attendance') renderAttendancePage();
+                if (hash === '#reports') document.getElementById('reportDate').value = new Date().toISOString().split('T')[0];
+            }
+
+            navLinks.forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    navigateTo(e.target.closest('a').getAttribute('href'));
+                });
+            });
+
+            // --- MODAL CONTROLS ---
+            Object.values(modals).forEach(modal => {
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal || e.target.classList.contains('close-btn')) {
+                        modal.style.display = 'none';
+                    }
+                });
+            });
+            function openModal(modalName) { modals[modalName].style.display = 'flex'; }
+
+            // --- UTILITY ---
+            const getToday = () => new Date().toISOString().split('T')[0];
+
+            // --- DASHBOARD ---
+            function renderDashboard() {
+                const studentCount = state.students.length;
+                const classCount = state.classes.length;
+                
+                document.getElementById('totalStudents').textContent = studentCount;
+                document.getElementById('totalClasses').textContent = classCount;
+
+                // Calculate today's income
+                const today = getToday();
+                let todaysIncome = 0;
+                if (state.attendance[today]) {
+                    Object.values(state.attendance[today]).forEach(classAttendance => {
+                        Object.values(classAttendance).forEach(studentStatus => {
+                            if (studentStatus.present && studentStatus.feePaid) {
+                                const classInfo = state.classes.find(c => c.id === studentStatus.classId);
+                                if (classInfo) {
+                                    todaysIncome += parseFloat(classInfo.fee);
+                                }
+                            }
+                        });
+                    });
+                }
+                document.getElementById('todaysIncome').textContent = `Rs ${todaysIncome.toFixed(2)}`;
+
+                // Render Bar Chart
+                const chart = document.getElementById('overviewChart');
+                chart.innerHTML = `
+                    <div class="bar" style="height: ${studentCount > 0 ? (studentCount / (studentCount + classCount)) * 100 : 0}%;">
+                        <div class="value">${studentCount}</div>
+                        <div class="label">Students</div>
+                    </div>
+                    <div class="bar" style="height: ${classCount > 0 ? (classCount / (studentCount + classCount)) * 100 : 0}%; background-color: #3498db;">
+                        <div class="value">${classCount}</div>
+                        <div class="label">Classes</div>
+                    </div>
+                `;
+            }
+
+            // --- TEACHER MANAGEMENT ---
+            const teacherForm = document.getElementById('teacherForm');
+            const teachersTableBody = document.querySelector('#teachersTable tbody');
+            document.getElementById('addTeacherBtn').addEventListener('click', () => {
+                teacherForm.reset();
+                document.getElementById('teacherIdInput').value = '';
+                document.getElementById('teacherModalTitle').textContent = 'Add Teacher';
+                openModal('teacher');
+            });
+
+            function renderTeachers() {
+                teachersTableBody.innerHTML = '';
+                state.teachers.forEach(t => {
+                    const row = teachersTableBody.insertRow();
+                    row.innerHTML = `
+                        <td>${t.name}</td>
+                        <td>${t.contact}</td>
+                        <td>
+                            <button class="btn btn-primary btn-small" onclick="editTeacher('${t.id}')">Edit</button>
+                            <button class="btn btn-danger btn-small" onclick="deleteTeacher('${t.id}')">Delete</button>
+                        </td>
+                    `;
+                });
+            }
+
+            teacherForm.addEventListener('submit', e => {
+                e.preventDefault();
+                const id = document.getElementById('teacherIdInput').value;
+                const teacherData = {
+                    name: document.getElementById('teacherName').value,
+                    contact: document.getElementById('teacherContact').value,
+                };
+                if (id) {
+                    const index = state.teachers.findIndex(t => t.id === id);
+                    state.teachers[index] = { ...state.teachers[index], ...teacherData };
+                } else {
+                    teacherData.id = 'T' + Date.now();
+                    state.teachers.push(teacherData);
+                }
+                saveData();
+                renderTeachers();
+                modals.teacher.style.display = 'none';
+            });
+
+            window.editTeacher = (id) => {
+                const teacher = state.teachers.find(t => t.id === id);
+                document.getElementById('teacherIdInput').value = id;
+                document.getElementById('teacherName').value = teacher.name;
+                document.getElementById('teacherContact').value = teacher.contact;
+                document.getElementById('teacherModalTitle').textContent = 'Edit Teacher';
+                openModal('teacher');
+            };
+
+            window.deleteTeacher = (id) => {
+                if (confirm('Are you sure? This may affect assigned classes.')) {
+                    state.teachers = state.teachers.filter(t => t.id !== id);
+                    // Unassign teacher from classes
+                    state.classes.forEach(c => { if(c.teacherId === id) c.teacherId = ''; });
+                    saveData();
+                    renderTeachers();
+                }
+            };
+
+            // --- CLASS MANAGEMENT ---
+            const classForm = document.getElementById('classForm');
+            const classListContainer = document.getElementById('classList');
+            document.getElementById('addClassBtn').addEventListener('click', () => {
+                classForm.reset();
+                document.getElementById('classIdInput').value = '';
+                document.getElementById('classModalTitle').textContent = 'Add Class';
+                populateTeacherDropdown();
+                openModal('class');
+            });
+
+            function populateSectionDropdown() {
+                const select = document.getElementById('classSection');
+                select.innerHTML = SECTIONS.map(s => `<option value="${s}">${s}</option>`).join('');
+            }
+
+            function populateTeacherDropdown(selectedId = '') {
+                const select = document.getElementById('classTeacher');
+                select.innerHTML = '<option value="">-- Select Teacher --</option>';
+                select.innerHTML += state.teachers.map(t => `<option value="${t.id}" ${t.id === selectedId ? 'selected' : ''}>${t.name}</option>`).join('');
+            }
+
+            function renderClasses() {
+                classListContainer.innerHTML = '';
+                const sections = {};
+                state.classes.forEach(c => {
+                    if (!sections[c.section]) sections[c.section] = [];
+                    sections[c.section].push(c);
+                });
+
+                for (const section in sections) {
+                    const sectionDiv = document.createElement('div');
+                    sectionDiv.innerHTML = `<h3>${section}</h3>`;
+                    const ul = document.createElement('ul');
+                    ul.style.listStyle = 'none';
+                    ul.style.paddingLeft = '10px';
+                    sections[section].forEach(c => {
+                        const teacher = state.teachers.find(t => t.id === c.teacherId);
+                        const li = document.createElement('li');
+                        li.style.display = 'flex';
+                        li.style.justifyContent = 'space-between';
+                        li.style.alignItems = 'center';
+                        li.style.padding = '10px 0';
+                        li.style.borderBottom = '1px solid var(--border-color)';
+                        li.innerHTML = `
+                            <div>
+                                <strong style="color: var(--primary-color);">${c.name}</strong><br>
+                                <small>Fee: Rs ${c.fee} | Teacher: ${teacher ? teacher.name : 'Not Assigned'}</small>
+                            </div>
+                            <div>
+                                <button class="btn btn-primary btn-small" onclick="editClass('${c.id}')">Edit</button>
+                                <button class="btn btn-danger btn-small" onclick="deleteClass('${c.id}')">Remove</button>
+                            </div>`;
+                        ul.appendChild(li);
+                    });
+                    sectionDiv.appendChild(ul);
+                    classListContainer.appendChild(sectionDiv);
+                }
+            }
+
+            classForm.addEventListener('submit', e => {
+                e.preventDefault();
+                const id = document.getElementById('classIdInput').value;
+                const classData = {
+                    name: document.getElementById('className').value,
+                    fee: parseFloat(document.getElementById('classFee').value),
+                    section: document.getElementById('classSection').value,
+                    teacherId: document.getElementById('classTeacher').value,
+                };
+                if (id) {
+                    const index = state.classes.findIndex(c => c.id === id);
+                    state.classes[index] = { ...state.classes[index], ...classData };
+                } else {
+                    classData.id = 'C' + Date.now();
+                    state.classes.push(classData);
+                }
+                saveData();
+                renderClasses();
+                modals.class.style.display = 'none';
+            });
+
+            window.editClass = (id) => {
+                const cls = state.classes.find(c => c.id === id);
+                document.getElementById('classIdInput').value = id;
+                document.getElementById('className').value = cls.name;
+                document.getElementById('classFee').value = cls.fee;
+                document.getElementById('classSection').value = cls.section;
+                populateTeacherDropdown(cls.teacherId);
+                document.getElementById('classModalTitle').textContent = 'Edit Class';
+                openModal('class');
+            };
+
+            window.deleteClass = (id) => {
+                if (confirm('Are you sure? This will also unenroll students from this class.')) {
+                    state.classes = state.classes.filter(c => c.id !== id);
+                    state.students.forEach(s => { s.classes = s.classes.filter(cid => cid !== id); });
+                    saveData();
+                    renderClasses();
+                    renderStudents();
+                }
+            };
+
+            // --- STUDENT MANAGEMENT ---
+            const studentForm = document.getElementById('studentForm');
+            const studentsTableBody = document.querySelector('#studentsTable tbody');
+            document.getElementById('addStudentBtn').addEventListener('click', () => openStudentModal());
+
+            function renderStudents() {
+                studentsTableBody.innerHTML = '';
+                state.students.forEach(s => {
+                    const row = studentsTableBody.insertRow();
+                    row.innerHTML = `
+                        <td>${s.id}</td>
+                        <td>${s.name}</td>
+                        <td>${s.grade}</td>
+                        <td>${s.whatsapp}</td>
+                        <td>
+                            <button class="btn btn-primary btn-small" onclick="openStudentModal('${s.id}')">Edit</button>
+                            <button class="btn btn-danger btn-small" onclick="deleteStudent('${s.id}')">Delete</button>
+                        </td>
+                    `;
+                });
+            }
+
+            function renderClassCheckboxes(selectedClasses = []) {
+                const container = document.getElementById('studentClassesCheckboxes');
+                container.innerHTML = state.classes.map(c => `
+                    <label style="display: block; margin-bottom: 5px;">
+                        <input type="checkbox" class="class-checkbox" value="${c.id}" ${selectedClasses.includes(c.id) ? 'checked' : ''}>
+                        ${c.name}
+                    </label>
+                `).join('');
+            }
+
+            window.openStudentModal = (id = null) => {
+                studentForm.reset();
+                document.getElementById('studentIdInput').value = id || '';
+                if (id) {
+                    const student = state.students.find(s => s.id === id);
+                    document.getElementById('studentModalTitle').textContent = 'Edit Student';
+                    document.getElementById('studentName').value = student.name;
+                    document.getElementById('studentAddress').value = student.address;
+                    document.getElementById('studentWhatsapp').value = student.whatsapp;
+                    document.getElementById('studentGrade').value = student.grade;
+                    renderClassCheckboxes(student.classes);
+                } else {
+                    document.getElementById('studentModalTitle').textContent = 'Add Student';
+                    renderClassCheckboxes();
+                }
+                openModal('student');
+            };
+
+            studentForm.addEventListener('submit', e => {
+                e.preventDefault();
+                const id = document.getElementById('studentIdInput').value;
+                const selectedClasses = Array.from(document.querySelectorAll('.class-checkbox:checked')).map(cb => cb.value);
+                const studentData = {
+                    name: document.getElementById('studentName').value,
+                    address: document.getElementById('studentAddress').value,
+                    whatsapp: document.getElementById('studentWhatsapp').value,
+                    grade: document.getElementById('studentGrade').value,
+                    classes: selectedClasses
+                };
+                if (id) {
+                    const index = state.students.findIndex(s => s.id === id);
+                    state.students[index] = { ...state.students[index], ...studentData };
+                } else {
+                    studentData.id = 'LHEC-' + Date.now();
+                    state.students.push(studentData);
+                }
+                saveData();
+                renderStudents();
+                modals.student.style.display = 'none';
+            });
+
+            window.deleteStudent = (id) => {
+                if (confirm('Are you sure you want to delete this student record?')) {
+                    state.students = state.students.filter(s => s.id !== id);
+                    saveData();
+                    renderStudents();
+                }
+            };
+
+            // --- ATTENDANCE ---
+            const attendanceClassSelect = document.getElementById('attendanceClassSelect');
+            const attendanceDateInput = document.getElementById('attendanceDate');
+            const attendanceSheetContainer = document.getElementById('attendanceSheet');
+
+            function renderAttendancePage() {
+                attendanceDateInput.value = getToday();
+                attendanceClassSelect.innerHTML = '<option value="">-- Please select --</option>';
+                attendanceClassSelect.innerHTML += state.classes.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+                attendanceSheetContainer.innerHTML = '<p>Select a class and date to begin.</p>';
+            }
+
+            function renderAttendanceSheet() {
+                const classId = attendanceClassSelect.value;
+                const date = attendanceDateInput.value;
+                attendanceSheetContainer.innerHTML = '';
+                if (!classId || !date) return;
+
+                const studentsInClass = state.students.filter(s => s.classes.includes(classId));
+                if (studentsInClass.length === 0) {
+                    attendanceSheetContainer.innerHTML = '<p>No students are enrolled in this class.</p>';
+                    return;
+                }
+
+                if (!state.attendance[date]) state.attendance[date] = {};
+                if (!state.attendance[date][classId]) state.attendance[date][classId] = {};
+                const classAttendance = state.attendance[date][classId];
+
+                let tableHTML = `
+                    <table id="attendance-table">
+                        <thead><tr><th>Student</th><th>Present</th><th>Fee Paid</th><th>Notes</th></tr></thead>
+                        <tbody>`;
+                
+                studentsInClass.forEach(student => {
+                    const record = classAttendance[student.id] || { present: false, feePaid: false, note: '' };
+                    tableHTML += `
+                        <tr data-studentid="${student.id}">
+                            <td>${student.name} (${student.id})</td>
+                            <td><input type="checkbox" class="attendance-present" ${record.present ? 'checked' : ''}></td>
+                            <td><button class="btn btn-small btn-toggle-fee ${record.feePaid ? 'btn-success' : 'btn-danger'}">${record.feePaid ? 'Paid' : 'Unpaid'}</button></td>
+                            <td><input type="text" class="attendance-note" value="${record.note}" placeholder="Reason if unpaid..." style="display: ${!record.feePaid ? 'block' : 'none'};"></td>
+                        </tr>`;
+                });
+
+                tableHTML += `</tbody></table><br><button class="btn btn-primary" id="saveAttendanceBtn">Save Attendance</button>`;
+                attendanceSheetContainer.innerHTML = tableHTML;
+            }
+
+            attendanceClassSelect.addEventListener('change', renderAttendanceSheet);
+            attendanceDateInput.addEventListener('change', renderAttendanceSheet);
+            
+            attendanceSheetContainer.addEventListener('click', e => {
+                if (e.target.classList.contains('btn-toggle-fee')) {
+                    const isPaid = e.target.textContent === 'Paid';
+                    e.target.textContent = isPaid ? 'Unpaid' : 'Paid';
+                    e.target.classList.toggle('btn-success');
+                    e.target.classList.toggle('btn-danger');
+                    const noteInput = e.target.closest('tr').querySelector('.attendance-note');
+                    noteInput.style.display = isPaid ? 'block' : 'none';
+                } else if (e.target.id === 'saveAttendanceBtn') {
+                    saveAttendance();
+                }
+            });
+
+            function saveAttendance() {
+                const classId = attendanceClassSelect.value;
+                const date = attendanceDateInput.value;
+                const rows = document.querySelectorAll('#attendance-table tbody tr');
+                
+                rows.forEach(row => {
+                    const studentId = row.dataset.studentid;
+                    const isPresent = row.querySelector('.attendance-present').checked;
+                    const feeButton = row.querySelector('.btn-toggle-fee');
+                    const isPaid = feeButton.textContent === 'Paid';
+                    const note = row.querySelector('.attendance-note').value;
+
+                    state.attendance[date][classId][studentId] = {
+                        present: isPresent,
+                        feePaid: isPaid,
+                        note: note,
+                        classId: classId // Store for easier lookup
+                    };
+                });
+                saveData();
+                alert('Attendance saved successfully!');
+                renderDashboard(); // Update income
+            }
+
+            // --- FINANCIAL REPORTS ---
+            const reportDateInput = document.getElementById('reportDate');
+            const reportContentContainer = document.getElementById('reportContent');
+            reportDateInput.addEventListener('change', generateReport);
+
+            function generateReport() {
+                const date = reportDateInput.value;
+                reportContentContainer.innerHTML = '';
+                if (!date || !state.attendance[date]) {
+                    reportContentContainer.innerHTML = '<p>No attendance data found for this date.</p>';
+                    return;
+                }
+
+                const dailyData = state.attendance[date];
+                let reportHTML = `
+                    <h3>Financial Report for ${date}</h3>
+                    <table id="report-table">
+                        <thead><tr><th>Class</th><th>Fees Collected</th><th>Center Commission (20%)</th><th>Teacher Payout (80%)</th><th>Teacher</th></tr></thead>
+                        <tbody>`;
+                
+                let grandTotal = 0;
+                let totalCommission = 0;
+                let totalPayout = 0;
+
+                for (const classId in dailyData) {
+                    const classInfo = state.classes.find(c => c.id === classId);
+                    if (!classInfo) continue;
+
+                    let classTotal = 0;
+                    const studentRecords = dailyData[classId];
+                    for (const studentId in studentRecords) {
+                        if (studentRecords[studentId].present && studentRecords[studentId].feePaid) {
+                            classTotal += classInfo.fee;
+                        }
+                    }
+
+                    if (classTotal > 0) {
+                        const commission = classTotal * 0.20;
+                        const payout = classTotal * 0.80;
+                        const teacher = state.teachers.find(t => t.id === classInfo.teacherId);
+
+                        grandTotal += classTotal;
+                        totalCommission += commission;
+                        totalPayout += payout;
+
+                        reportHTML += `
+                            <tr>
+                                <td>${classInfo.name}</td>
+                                <td>Rs ${classTotal.toFixed(2)}</td>
+                                <td>Rs ${commission.toFixed(2)}</td>
+                                <td>Rs ${payout.toFixed(2)}</td>
+                                <td>${teacher ? teacher.name : 'N/A'}</td>
+                            </tr>`;
+                    }
+                }
+                
+                reportHTML += `
+                    </tbody>
+                    <tfoot>
+                        <tr style="font-weight: bold; background: var(--light-color);">
+                            <td>TOTALS</td>
+                            <td>Rs ${grandTotal.toFixed(2)}</td>
+                            <td>Rs ${totalCommission.toFixed(2)}</td>
+                            <td>Rs ${totalPayout.toFixed(2)}</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                    </table>`;
+                reportContentContainer.innerHTML = reportHTML;
+            }
+
+            // --- EXPORT FUNCTIONS ---
+            document.getElementById('exportCsvBtn').addEventListener('click', () => {
+                let csvContent = "data:text/csv;charset=utf-8,";
+                csvContent += "Student ID,Name,Grade,Address,WhatsApp,Enrolled Classes\n";
+                state.students.forEach(s => {
+                    const classNames = s.classes.map(cid => state.classes.find(c => c.id === cid)?.name || '').join('; ');
+                    const row = [s.id, s.name, s.grade, `"${s.address}"`, s.whatsapp, `"${classNames}"`].join(',');
+                    csvContent += row + "\n";
+                });
+                const encodedUri = encodeURI(csvContent);
+                const link = document.createElement("a");
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", "lihansa_students.csv");
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            });
+
+            document.getElementById('exportPdfBtn').addEventListener('click', () => {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                
+                doc.text("Lihansa Higher Education Center - Student Records", 14, 15);
+                
+                const tableData = state.students.map(s => [
+                    s.id,
+                    s.name,
+                    s.grade,
+                    s.whatsapp,
+                    s.classes.map(cid => state.classes.find(c => c.id === cid)?.name || '').join(', ')
+                ]);
+
+                doc.autoTable({
+                    head: [['ID', 'Name', 'Grade', 'WhatsApp', 'Classes']],
+                    body: tableData,
+                    startY: 20,
+                });
+
+                doc.save('lihansa_students.pdf');
+            });
+
+            // --- INITIALIZATION ---
+            function initialize() {
+                populateSectionDropdown();
+                renderStudents();
+                renderClasses();
+                renderTeachers();
+                navigateTo('#dashboard');
+            }
+
+            // Start the authentication check
+            handleAuth();
+        });
+    </script>
+
+</body>
+</html>
